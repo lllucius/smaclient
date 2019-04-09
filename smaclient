@@ -843,7 +843,7 @@ function int1
 # =============================================================================
 function chars
 {
-    echo -n "${2:0:$1}" | xxd -p
+    echo -n "${2:0:$1}" | xxd -p -c 65536
 }
 
 # =============================================================================
@@ -854,7 +854,7 @@ function string
     local s="${*}"
 
     int4 ${#s}
-    echo -n "${s}" | xxd -p
+    echo -n "${s}" | xxd -p -c 65536
 }
 
 # =============================================================================
@@ -862,7 +862,7 @@ function string
 # =============================================================================
 function asciiz
 {
-    echo -e -n "${*}\x00" | xxd -p
+    echo -e -n "${*}\x00" | xxd -p -c 65536
 }
 
 # =============================================================================
@@ -940,12 +940,12 @@ function smapi
         # Calculate and prepend request length, convert from hex to
         # binary representation, send to the SMAPI server, and wait
         # for the response.
-        resp=$({ int4 $(( ${#s} / 2 )) ; echo -n ${s} ; } | xxd -r -p >&3 && xxd -p <&3)
+        resp=$({ int4 $(( ${#s} / 2 )) ; echo -n ${s} ; } | xxd -r -p >&3 && xxd -p -c 65536 <&3)
     else
         # Calculate and prepend request length, convert from hex to
         # binary representation, send to the SMAPI server, and wait
         # for the response.
-        resp=$({ int4 $(( ${#s} / 2 )) ; echo -n ${s} ; } | xxd -r -p | smiucv | xxd -p)
+        resp=$({ int4 $(( ${#s} / 2 )) ; echo -n ${s} ; } | xxd -r -p | smiucv | xxd -p -c 65536)
     fi
 
     # Get rid of any blanks inserted by xxd (don't quote it)
@@ -9101,41 +9101,46 @@ function Virtual_Network_Vswitch_Query_Extended
     execute_keywords
 
     # Retrieve vswitch count
-    getasciiz vswitch_count
+    get4 vswitch_count
 
     for (( i = 0; i < vswitch_count; i++ ))
     do
-        getasciiz vswitch_structure_length
-        getasciiz vswitch_attr_count
+        get4 vswitch_structure_length
+        get4 vswitch_attr_info_length
 
         echo "VSWITCH Info:"
         echo
 
-        getasciiz switch_name
-        getasciiz transport_type
-        getasciiz port_type
-        getasciiz queue_memory_limit
-        getasciiz routing_value
-        getasciiz vlan_awareness
-        getasciiz vlan_id
-        getasciiz native_vlan_id
-        getasciiz mac_id
-        getasciiz gvrp_request_attribute
-        getasciiz gvrp_enabled_attribute
-        getasciiz switch_status
-        getasciiz link_ag
-        getasciiz lag_interval
-        getasciiz lag_group
-        getasciiz ip_timeout
-        getasciiz switch_type
-        getasciiz isolation_status
-        getasciiz mac_protect
-        getasciiz user_port_based
-        if [ ${vswitch_attr_count} -gt 20 ]
-        then
-            getasciiz vlan_counters
-        fi
+        getasciiz vswitch_structure
+        set -- ${vswitch_structure}
 
+        switch_name="${1}"
+        transport_type="${2}"
+        port_type="${3}"
+        queue_memory_limit="${4}"
+        routing_value="${5}"
+        vlan_awareness="${6}"
+        vlan_id="${7}"
+        native_vlan_id="${8}"
+        mac_id="${9}"
+        gvrp_request_attribute="${10}"
+        gvrp_enabled_attribute="${11}"
+        switch_status="${12}"
+        link_ag="${13}"
+        lag_interval="${14}"
+        lag_group="${15}"
+        ip_timeout="${16}"
+        switch_type="${17}"
+        isolation_status="${18}"
+        mac_protect="${29}"
+        user_port_based="${20}"
+        vlan_counters="${21}"
+        if [[ ${argv[@]} =~ .*vepa_status=yes.* ]]
+        then
+            vepa_status="${22}"
+            shift
+        fi
+        spg_scope="${22}"
 
         # Convert switch_status
         case "${switch_status}" in
@@ -9176,16 +9181,22 @@ function Virtual_Network_Vswitch_Query_Extended
         echo "    MAC Protect: ${mac_protect}"
         echo "    User Port Based: ${user_port_based}"
         echo "    VLAN Counters: ${vlan_counters}"
+        if [[ ${argv[@]} =~ .*vepa_status=yes.* ]]
+        then
+            echo "    VEPA Status: ${vepa_status}"
+        fi
+        echo "    Shared Port Group Scope: ${spg_scope}"
         echo
-    
-        getasciiz real_device_count
+
+        get4 real_device_length
 
         echo "  Device Info:"
         echo
         
-        for (( j = 0; j < real_device_count; j++ ))
+        while [ ${real_device_length} -gt 0 ]
         do
             getasciiz real_device_info_structure
+            real_device_length=$((real_device_length - ${#real_device_info_structure} - 1))
             set -- ${real_device_info_structure}
 
             device_status="${5}"
@@ -9241,14 +9252,15 @@ function Virtual_Network_Vswitch_Query_Extended
             echo
         done
         
-        getasciiz authorized_user_count
+        get4 authorized_user_length
 
         echo "  Authorized User Info:"
         echo
 
-        for (( j = 0; j < authorized_user_count; j++ ))
+        while [ ${authorized_user_length} -gt 0 ]
         do
             getasciiz authorized_user_structure
+            authorized_user_length=$((authorized_user_length - ${#authorized_user_structure} - 1))
             set -- ${authorized_user_structure}
 
             echo "    Port Number: ${1}"
@@ -9256,7 +9268,7 @@ function Virtual_Network_Vswitch_Query_Extended
             echo "    Promiscuous Mode: ${3}"
             echo "    OSD Simulation: ${4}"
 
-            getasciiz vlan_count
+            vlan_count="${5}"
 
             echo "    VLAN Info:"
             echo
@@ -9269,14 +9281,15 @@ function Virtual_Network_Vswitch_Query_Extended
             echo
         done
 
-        getasciiz connected_adapter_count
+        get4 connected_adapter_length
 
         echo "  Connected Adapter Info:"
         echo
 
-        for (( j = 0; j < connected_adapter_count; j++ ))
+        while [ ${connected_adapter_length} -gt 0 ]
         do
             getasciiz connected_adapter_structure
+            connected_adapter_length=$((connected_adapter_length - ${#connected_adapter_structure} - 1))
             set -- ${connected_adapter_structure}
 
             echo "    Adapter Owner: ${1}"
@@ -9286,14 +9299,15 @@ function Virtual_Network_Vswitch_Query_Extended
             echo
         done
 
-        getasciiz uplink_nic_count
+        get4 uplink_nic_length
 
         echo "  Uplink Nic Info:"
         echo
 
-        for (( j = 0; j < uplink_nic_count; j++ ))
+        while [ ${uplink_nic_length} -gt 0 ]
         do
             getasciiz uplink_nic_structure
+            uplink_nic_length=$((uplink_nic_length - ${#uplink_nic_structure}))
             set -- ${uplink_nic_structure}
 
             uplink_nic_error_status="${3}"
@@ -9318,6 +9332,32 @@ function Virtual_Network_Vswitch_Query_Extended
             echo "    Userid: ${1}"
             echo "    VDEV: ${2}"
             echo "    Error Status: ${uplink_nic_error_status}"
+            echo
+        done
+
+        get4 global_member_array_length
+
+        echo "  Global Member Info:"
+        echo
+
+        while [ ${global_member_array_length} -gt 0 ]
+        do
+            getasciiz global_member_structure
+            global_member_array_length=$((global_member_array_length - ${#global_member_structure} - 1))
+            set -- ${global_member_structure}
+
+            member_state="${2}"
+
+            # Convert member_state
+            case "${member_state}" in
+                NoSyn) member_state="${member_state} (Not synchronized)" ;;
+                Error) member_state="${member_state} (Error)" ;;
+                Pending) member_state="${member_state} (Pending synchronization)" ;;
+                Synced) member_state="${member_state} (Synchronized)" ;;
+            esac
+
+            echo "    Member Name: ${1}"
+            echo "    Member State: ${member_state}"
             echo
         done
     done
@@ -9894,22 +9934,33 @@ function VMRM_Configuration_Update
     OIFS="${IFS}"
     IFS=$'\n'
     update_file=""
-    while read log_record
+    while read update_record
     do
-        update_file="${update_file}$(asciiz """${log_record}""")"
+        update_file="${update_file}$(asciiz """${update_record}""")"
     done
     IFS="${OIFS}"
 
     # Build and send the request
-    execute $(string "${configuration_file_name}") \
+    execute_no_check $(string "${configuration_file_name}") \
             $(string "${configuration_file_type}") \
             $(string "${configuration_dir_name}") \
             $(int1 "${syncheck_only}") \
-            $(int4 ${#update_file}) \
+            $(int4 $(( ${#update_file} / 2 ))) \
             ${update_file}
 
-    # Retrieve and show the returned array
-    showstringarray
+    # Handle errors locally
+    if [ ${retc} -ne 0 -o ${reas} -ne 0 ]
+    then
+        showerror
+
+        if [ ${retc} -eq 800 ]
+        then
+            # Retrieve and show the returned array
+            showstringarray
+        fi
+
+        exit 1
+    fi
 }
 
 # =============================================================================
