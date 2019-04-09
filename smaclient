@@ -8313,21 +8313,25 @@ function Virtual_Network_VLAN_Query_Stats
     execute_keywords
 
     # Retrieve the length of the returned array
-    getasciiz port_array_length
+    get4 port_array_length
 
     # Retrieve and process array entries
     while [ ${#resp} -gt 0 ]
     do
         # Retrieve entry fields
-        getasciiz port_name
-        getasciiz port_num
+        get4 port_nic_array_length
+
+        getasciiz port_nic_structure
+        set -- ${port_nic_structure}
 
         echo "Port Info:"
-        echo "  Port Name: ${port_name}"
-        echo "  Port Number: ${port_num}"
+        echo "  Port Type: ${1}"
+        echo "  Port/NIC Name: ${2}"
+        echo "  Port/NIC Number: ${3}"
         echo "  Segment Info:"
 
-        getasciiz pseg_array_length
+        get4 pseg_array_length
+
         i=$(( ${#resp} - pseg_array_length * 2 ))
         while [ ${#resp} -gt ${i} ]
         do
