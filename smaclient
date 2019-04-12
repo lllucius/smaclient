@@ -4331,7 +4331,7 @@ function Image_Lock_DM
     # Tell user it was successful
     if [ -z "${device_address}" ]
     then
-        echo "${smtarg}'s locked"
+        echo "${smtarg} locked"
     else
         echo "${smtarg}'s ${device_address} disk locked"
     fi
